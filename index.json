@@ -1,0 +1,260 @@
+{
+  "platforms": [
+    {
+      "name": "web",
+      "label": "Web",
+      "servers": [
+        {
+          "name": "java",
+          "label": "Java",
+          "clients": [
+            {
+              "name": "html",
+              "label": "HTML"
+            },
+            {
+              "name": "jinjava",
+              "label": "JinJava"
+            }
+          ]
+        },
+        {
+          "name": "js",
+          "label": "NodeJS",
+          "clients": [
+            {
+              "name": "html",
+              "label": "HTML"
+            },
+            {
+              "name": "react",
+              "label": "React"
+            },
+            {
+              "name": "handlebar",
+              "label": "Handlebar"
+            }
+          ]
+        },
+        {
+          "name": "go",
+          "label": "Go",
+          "clients": [
+            {
+              "name": "html",
+              "label": "HTML"
+            },
+            {
+              "name": "gotemplates",
+              "label": "Go Templates"
+            }
+          ]
+        },
+        {
+          "name": "csharp",
+          "label": ".NET",
+          "clients": [
+            {
+              "name": "html",
+              "label": "HTML"
+            },
+            {
+              "name": "aspnet",
+              "label": "ASP.NET"
+            }
+          ]
+        },
+        {
+          "name": "python",
+          "label": "Python",
+          "clients": [
+            {
+              "name": "html",
+              "label": "HTML"
+            },
+            {
+              "name": "flask",
+              "label": "Flask"
+            }
+          ]
+        },
+        {
+          "name": "ruby",
+          "label": "Ruby",
+          "clients": [
+            {
+              "name": "html",
+              "label": "HTML"
+            },
+            {
+              "name": "rails",
+              "label": "Rails"
+            }
+          ]
+        },
+        {
+          "name": "php",
+          "label": "PHP",
+          "clients": [
+            {
+              "name": "php",
+              "label": "PHP"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "android",
+      "label": "Android",
+      "servers": [
+        {
+          "name": "java",
+          "label": "Java",
+          "clients": [
+            {
+              "name": "kotlin",
+              "label": "Kotlin"
+            }
+          ]
+        },
+        {
+          "name": "js",
+          "label": "NodeJS",
+          "clients": [
+            {
+              "name": "kotlin",
+              "label": "Kotlin"
+            }
+          ]
+        },
+        {
+          "name": "go",
+          "label": "Go",
+          "clients": [
+            {
+              "name": "kotlin",
+              "label": "Kotlin"
+            }
+          ]
+        },
+        {
+          "name": "csharp",
+          "label": ".NET",
+          "clients": [
+            {
+              "name": "kotlin",
+              "label": "Kotlin"
+            }
+          ]
+        },
+        {
+          "name": "python",
+          "label": "Python",
+          "clients": [
+            {
+              "name": "kotlin",
+              "label": "Kotlin"
+            }
+          ]
+        },
+        {
+          "name": "ruby",
+          "label": "Ruby",
+          "clients": [
+            {
+              "name": "kotlin",
+              "label": "Kotlin"
+            }
+          ]
+        },
+        {
+          "name": "php",
+          "label": "PHP",
+          "clients": [
+            {
+              "name": "kotlin",
+              "label": "Kotlin"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ios",
+      "label": "iOS",
+      "servers": [
+        {
+          "name": "java",
+          "label": "Java",
+          "clients": [
+            {
+              "name": "swift",
+              "label": "Swift"
+            }
+          ]
+        },
+        {
+          "name": "js",
+          "label": "NodeJS",
+          "clients": [
+            {
+              "name": "swift",
+              "label": "Swift"
+            }
+          ]
+        },
+        {
+          "name": "go",
+          "label": "Go",
+          "clients": [
+            {
+              "name": "swift",
+              "label": "Swift"
+            }
+          ]
+        },
+        {
+          "name": "csharp",
+          "label": ".NET",
+          "clients": [
+            {
+              "name": "swift",
+              "label": "Swift"
+            }
+          ]
+        },
+        {
+          "name": "python",
+          "label": "Python",
+          "clients": [
+            {
+              "name": "swift",
+              "label": "Swift"
+            }
+          ]
+        },
+        {
+          "name": "ruby",
+          "label": "Ruby",
+          "clients": [
+            {
+              "name": "swift",
+              "label": "Swift"
+            }
+          ]
+        },
+        {
+          "name": "php",
+          "label": "PHP",
+          "clients": [
+            {
+              "name": "swift",
+              "label": "Swift"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
