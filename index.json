@@ -5,20 +5,6 @@
       "label": "Web",
       "servers": [
         {
-          "name": "java",
-          "label": "Java",
-          "clients": [
-            {
-              "name": "html",
-              "label": "HTML"
-            },
-            {
-              "name": "jinjava",
-              "label": "JinJava"
-            }
-          ]
-        },
-        {
           "name": "js",
           "label": "NodeJS",
           "clients": [
@@ -33,6 +19,20 @@
             {
               "name": "handlebar",
               "label": "Handlebar"
+            }
+          ]
+        },
+        {
+          "name": "java",
+          "label": "Java",
+          "clients": [
+            {
+              "name": "html",
+              "label": "HTML"
+            },
+            {
+              "name": "jinjava",
+              "label": "JinJava"
             }
           ]
         },
