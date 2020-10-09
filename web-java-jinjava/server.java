@@ -1,246 +1,299 @@
-const express = require("express");
-const path = require("path");
-const hbs = require("express-handlebars");
-const dotenv = require("dotenv");
-const morgan = require("morgan");
-const { uuid } = require("uuidv4");
-const { Client, Config, CheckoutAPI } = require("@adyen/api-library");
+package controller;
 
-// init app
-const app = express();
-// setup request logging
-app.use(morgan("dev"));
-// Parse JSON bodies
-app.use(express.json());
-// Parse URL-encoded bodies
-app.use(express.urlencoded({ extended: true }));
-// Serve client from build folder
-app.use(express.static(path.join(__dirname, "/public")));
+import com.adyen.model.checkout.PaymentsDetailsRequest;
+import com.adyen.model.checkout.PaymentsRequest;
+import com.adyen.model.checkout.PaymentsResponse;
+import com.google.common.io.ByteStreams;
+import com.google.common.io.Closeables;
+import com.google.common.net.MediaType;
+import org.apache.http.NameValuePair;
+import spark.QueryParamsMap;
+import view.RenderUtil;
 
-// enables environment variables by
-// parsing the .env file and assigning it to process.env
-dotenv.config({
-  path: "./.env",
-});
+import java.io.*;
+import java.util.*;
 
-// Adyen Node.js API library boilerplate (configuration, etc.)
-const config = new Config();
-config.apiKey = process.env.API_KEY;
-const client = new Client({ config });
-client.setEnvironment("TEST");
-const checkout = new CheckoutAPI(client);
 
-// A temporary store to keep payment data to be sent in additional payment details and redirects.
-// This is more secure than a cookie. In a real application this should be in a database.
-const paymentDataStore = {};
+import model.PaymentMethods;
+import model.Payments;
+import model.PaymentsDetails;
 
-app.engine(
-  "handlebars",
-  hbs({
-    defaultLayout: "main",
-    layoutsDir: __dirname + "/views/layouts",
-    helpers: require("./util/helpers"),
-  })
-);
+import static spark.Spark.*;
+import spark.Response;
 
-app.set("view engine", "handlebars");
 
-/* ################# API ENDPOINTS ###################### */
+public class Main {
 
-// Get payment methods
-app.post("/api/getPaymentMethods", async (req, res) => {
-  try {
-    const response = await checkout.paymentMethods({
-      channel: "Web",
-      merchantAccount: process.env.MERCHANT_ACCOUNT,
-    });
-    res.json(response);
-  } catch (err) {
-    console.error(`Error: ${err.message}, error code: ${err.errorCode}`);
-    res.status(err.statusCode).json(err.message);
-  }
-});
+	private static final File FAVICON_PATH = new File("src/main/resources/static/img/favicon.ico");
+	private static final String configFile = "config.properties";
 
-// Submitting a payment
-app.post("/api/initiatePayment", async (req, res) => {
-  const currency = findCurrency(req.body.paymentMethod.type);
-  // find shopper IP from request
-  const shopperIP = req.headers["x-forwarded-for"] || req.connection.remoteAddress;
+	public static String merchantAccount = "";
+	public static String apiKey = "";
+	public static String clientKey = "";
 
-  try {
-    // unique ref for the transaction
-    const orderRef = uuid();
-    // Ideally the data passed here should be computed based on business logic
-    const response = await checkout.payments({
-      amount: { currency, value: 1000 }, // value is 10€ in minor units
-      reference: orderRef,
-      merchantAccount: process.env.MERCHANT_ACCOUNT,
-      shopperIP,
-      channel: "Web",
-      additionalData: {
-        allow3DS2: true,
-      },
-      // we pass the orderRef in return URL to get paymentData during redirects
-      returnUrl: `http://localhost:8080/api/handleShopperRedirect?orderRef=${orderRef}`,
-      browserInfo: req.body.browserInfo,
-      // special handling for boleto
-      paymentMethod: req.body.paymentMethod.type.includes("boleto")
-        ? {
-            type: "boletobancario_santander",
-          }
-        : req.body.paymentMethod,
-      // Below fields are required for Boleto:
-      socialSecurityNumber: req.body.socialSecurityNumber,
-      shopperName: req.body.shopperName,
-      billingAddress:
-        typeof req.body.billingAddress === "undefined" || Object.keys(req.body.billingAddress).length === 0
-          ? null
-          : req.body.billingAddress,
-      deliveryDate: "2023-12-31T23:00:00.000Z",
-      shopperStatement: "Aceitar o pagamento até 15 dias após o vencimento.Não cobrar juros. Não aceitar o pagamento com cheque",
-      // Below fields are required for Klarna:
-      countryCode: req.body.paymentMethod.type.includes("klarna") ? "DE" : null,
-      shopperReference: "12345",
-      shopperEmail: "youremail@email.com",
-      shopperLocale: "en_US",
-      lineItems: [
-        {
-          quantity: "1",
-          amountExcludingTax: "331",
-          taxPercentage: "2100",
-          description: "Shoes",
-          id: "Item 1",
-          taxAmount: "69",
-          amountIncludingTax: "400",
-        },
-        {
-          quantity: "2",
-          amountExcludingTax: "248",
-          taxPercentage: "2100",
-          description: "Socks",
-          id: "Item 2",
-          taxAmount: "52",
-          amountIncludingTax: "300",
-        },
-      ],
-    });
+	public static void main(String[] args) {
+		port(8080);
+		staticFiles.location("/static");
+		readConfigFile();
 
-    const { action } = response;
+        Client client = new Client(Main.apiKey, Environment.TEST);
+        Checkout checkout = new Checkout(client);
 
-    if (action) {
-      paymentDataStore[orderRef] = action.paymentData;
-    }
-    res.json(response);
-  } catch (err) {
-    console.error(`Error: ${err.message}, error code: ${err.errorCode}`);
-    res.status(err.statusCode).json(err.message);
-  }
-});
+		// Routes
+		get("/", (req, res) -> {
+			Map<String, Object> context = new HashMap<>();
+			return RenderUtil.render(context, "templates/home.html");
+		});
 
-app.post("/api/submitAdditionalDetails", async (req, res) => {
-  // Create the payload for submitting payment details
-  const payload = {
-    details: req.body.details,
-    paymentData: req.body.paymentData,
-  };
+		get("/cart/:integration", (req, res) -> {
+			String integrationType = req.params(":integration");
 
-  try {
-    // Return the response back to client
-    // (for further action handling or presenting result to shopper)
-    const response = await checkout.paymentsDetails(payload);
+			Map<String, Object> context = new HashMap<>();
+			context.put("integrationType", "/checkout/" + integrationType);
 
-    res.json(response);
-  } catch (err) {
-    console.error(`Error: ${err.message}, error code: ${err.errorCode}`);
-    res.status(err.statusCode).json(err.message);
-  }
-});
+			return RenderUtil.render(context, "templates/cart.html");
+		});
 
-// Handle all redirects from payment type
-app.all("/api/handleShopperRedirect", async (req, res) => {
-  // Create the payload for submitting payment details
-  const orderRef = req.query.orderRef;
-  const payload = {
-    details: req.method === "GET" ? req.query : req.body,
-    paymentData: paymentDataStore[orderRef],
-  };
+		get("/checkout/:integration", (req, res) -> {
+			String integrationType = req.params(":integration");
 
-  try {
-    const response = await checkout.paymentsDetails(payload);
-    // Conditionally handle different result codes for the shopper
-    switch (response.resultCode) {
-      case "Authorised":
-        res.redirect("/result/success");
-        break;
-      case "Pending":
-      case "Received":
-        res.redirect("/result/pending");
-        break;
-      case "Refused":
-        res.redirect("/result/failed");
-        break;
-      default:
-        res.redirect("/result/error");
-        break;
-    }
-  } catch (err) {
-    console.error(`Error: ${err.message}, error code: ${err.errorCode}`);
-    res.redirect("/error");
-  }
-});
+			Map<String, Object> context = new HashMap<>();
+			context.put("paymentMethods", PaymentMethods.getPaymentMethods(integrationType));
+			context.put("clientKey", clientKey);
+			context.put("integrationType", integrationType);
 
-/* ################# end API ENDPOINTS ###################### */
+			return RenderUtil.render(context, "templates/component.html");
+		});
 
-/* ################# CLIENT SIDE ENDPOINTS ###################### */
+		post("/api/getPaymentMethods", (req, res) -> {
+            String paymentMethods;
 
-// Index (select a demo)
-app.get("/", (req, res) => res.render("index"));
+            PaymentMethodsRequest paymentMethodsRequest = new PaymentMethodsRequest();
+            paymentMethodsRequest.setMerchantAccount(Main.merchantAccount);
 
-// Cart (continue to checkout)
-app.get("/preview", (req, res) =>
-  res.render("preview", {
-    type: req.query.type,
-  })
-);
+            Amount amount = new Amount();
+            if (type.equals("dotpay")) {
+                amount.setCurrency("PLN");
+            } else {
+                amount.setCurrency("EUR");
+            }
+            amount.setValue(1000L);
+            paymentMethodsRequest.setAmount(amount);
+            paymentMethodsRequest.setChannel(PaymentMethodsRequest.ChannelEnum.WEB);
+            System.out.println("/paymentMethods context:\n" + paymentMethodsRequest.toString());
 
-// Checkout page (make a payment)
-app.get("/checkout", (req, res) =>
-  res.render("checkout", {
-    type: req.query.type,
-    clientKey: process.env.CLIENT_KEY,
-  })
-);
+            try {
+                PaymentMethodsResponse response = checkout.paymentMethods(paymentMethodsRequest);
+                Gson gson = new GsonBuilder().create();
+                paymentMethods = gson.toJson(response);
+                System.out.println("/paymentMethods response:\n" + paymentMethods);
+            } catch (ApiException | IOException e) {
+                return e.toString();
+            }
 
-// Result page
-app.get("/result/:type", (req, res) =>
-  res.render("result", {
-    type: req.params.type,
-  })
-);
+			return paymentMethods;
+		});
 
-/* ################# end CLIENT SIDE ENDPOINTS ###################### */
+		post("/api/initiatePayment", (req, res) -> {
+			System.out.println("Request received from client:\n" + req.body());
+			PaymentsRequest paymentsRequest = FrontendParser.parsePayment(req.body());
 
-/* ################# UTILS ###################### */
+            String type = paymentsRequest.getPaymentMethod().getType();
 
-function findCurrency(type) {
-  switch (type) {
-    case "ach":
-      return "USD";
-    case "wechatpayqr":
-    case "alipay":
-      return "CNY";
-    case "dotpay":
-      return "PLN";
-    case "boletobancario":
-    case "boletobancario_santander":
-      return "BRL";
-    default:
-      return "EUR";
-  }
+            setAmount(paymentsRequest, type);
+            paymentsRequest.setChannel(PaymentsRequest.ChannelEnum.WEB);
+            paymentsRequest.setMerchantAccount(Main.merchantAccount);
+            paymentsRequest.setReturnUrl("http://localhost:8080/api/handleShopperRedirect");
+
+            paymentsRequest.setReference("Java Integration Test Reference");
+            paymentsRequest.setShopperReference("Java Checkout Shopper");
+
+            paymentsRequest.setCountryCode("NL");
+
+            if (type.equals("alipay")) {
+                paymentsRequest.setCountryCode("CN");
+
+            } else if (type.contains("klarna")) {
+                paymentsRequest.setShopperEmail("myEmail@adyen.com");
+                paymentsRequest.setShopperLocale("en_US");
+
+                addLineItems(paymentsRequest);
+
+            } else if (type.equals("directEbanking") || type.equals("giropay")) {
+                paymentsRequest.countryCode("DE");
+
+            } else if (type.equals("dotpay")) {
+                paymentsRequest.countryCode("PL");
+                paymentsRequest.getAmount().setCurrency("PLN");
+
+            } else if (type.equals("scheme")) {
+                paymentsRequest.setOrigin("http://localhost:8080");
+                paymentsRequest.putAdditionalDataItem("allow3DS2", "true");
+
+            } else if (type.equals("ach") || type.equals("paypal")) {
+                paymentsRequest.countryCode("US");
+            }
+
+            System.out.println("/payments request:\n" + paymentsRequest.toString());
+
+            try {
+                PaymentsResponse response = checkout.payments(paymentsRequest);
+                PaymentsResponse formattedResponse = FrontendParser.formatResponseForFrontend(response);
+
+                GsonBuilder builder = new GsonBuilder();
+                Gson gson = builder.create();
+                String paymentsResponse = gson.toJson(formattedResponse);
+                System.out.println("/payments response:\n" + paymentsResponse);
+                return paymentsResponse;
+            } catch (ApiException | IOException e) {
+                return e.toString();
+            }
+		});
+
+		post("/api/submitAdditionalDetails", (req, res) -> {
+			PaymentsDetailsRequest paymentsDetailsRequest = FrontendParser.parseDetails(req.body());
+            System.out.println("/paymentsDetails request:" + paymentsDetailsRequest.toString());
+            PaymentsResponse paymentsDetailsResponse = null;
+            try {
+                paymentsDetailsResponse = checkout.paymentsDetails(paymentsDetailsRequest);
+
+            } catch (ApiException | IOException e) {
+                e.printStackTrace();
+            } finally {
+                if (paymentsDetailsResponse != null) {
+                    System.out.println("paymentsDetails response:\n" + paymentsDetailsResponse.toString());
+                }
+            }
+
+		    Gson gson = new GsonBuilder().create();
+		    return gson.toJson(paymentsDetailsResponse);    
+		});
+
+		get("/api/handleShopperRedirect", (req, res) -> {
+			System.out.println("GET redirect handler");
+
+			QueryParamsMap queryMap = req.queryMap();
+			String key = "";
+			String value = "";
+
+			if (queryMap.hasKey("redirectResult")) {
+				key =  "redirectResult";
+				value = queryMap.value("redirectResult");
+
+			} else if (queryMap.hasKey("payload")) {
+				key = "payload";
+				value = queryMap.value("payload");
+			}
+
+			Map<String, Object> context = new HashMap<>();
+			String valuesArray = "{\n" +
+					"\"" + key + "\": \"" + value + "\"" +
+					"}";
+			context.put("valuesArray", valuesArray);
+
+			return RenderUtil.render(context, "templates/fetch-payment-data.html"); // Get paymentData from localStorage
+		});
+
+		post("/api/handleShopperRedirect", (req, res) -> {
+			System.out.println("POST redirect handler");
+
+			// Triggers when POST contains query params. Triggers on call back from issuer after 3DS2 challenge w/ MD & PaRes
+			if (!req.body().contains("paymentData")) {
+				List<NameValuePair> params = FrontendParser.parseQueryParams(req.body());
+				String md = params.get(0).getValue();
+				String paRes = params.get(1).getValue();
+
+				Map<String, Object> context = new HashMap<>();
+				String valuesArray = "{\n" +
+						"\"MD\": \"" + md + "\",\n" +
+						"\"PaRes\": \"" + paRes + "\"\n" +
+						"}";
+				context.put("valuesArray", valuesArray);
+
+				return RenderUtil.render(context, "templates/fetch-payment-data.html"); // Get paymentData from localStorage
+
+			} else {
+				PaymentsDetailsRequest pdr = FrontendParser.parseDetails(req.body());
+
+				PaymentsResponse paymentResult = PaymentsDetails.getPaymentsDetailsObject(pdr);
+				PaymentsResponse.ResultCodeEnum result = paymentResult.getResultCode();
+
+				switch (result) {
+					case AUTHORISED:
+						res.redirect("/success");
+						break;
+					case RECEIVED: case PENDING:
+						res.redirect("/pending");
+						break;
+					default:
+						res.redirect("/failed");
+				}
+				return res;
+			}
+		});
+
+		get("/success", (req, res) -> {
+			Map<String, Object> context = new HashMap<>();
+			return RenderUtil.render(context, "templates/checkout-success.html");
+		});
+
+		get("/failed", (req, res) -> {
+			Map<String, Object> context = new HashMap<>();
+			return RenderUtil.render(context, "templates/checkout-failed.html");
+		});
+
+		get("/pending", (req, res) -> {
+			Map<String, Object> context = new HashMap<>();
+			return RenderUtil.render(context, "templates/checkout-success.html");
+		});
+
+		get("/error", (req, res) -> {
+			Map<String, Object> context = new HashMap<>();
+			return RenderUtil.render(context, "templates/checkout-failed.html");
+		});
+
+		get("/favicon.ico", (req, res) -> {
+			return getFavicon(res);
+		});
+	}
+
+	private static Object getFavicon(Response res) {
+		try {
+			InputStream in = null;
+			OutputStream out;
+			try {
+				in = new BufferedInputStream(new FileInputStream(FAVICON_PATH));
+				out = new BufferedOutputStream(res.raw().getOutputStream());
+				res.raw().setContentType(MediaType.ICO.toString());
+				ByteStreams.copy(in, out);
+				out.flush();
+				return "";
+			} finally {
+				Closeables.close(in, true);
+			}
+		} catch (FileNotFoundException ex) {
+			res.status(404);
+			return ex.getMessage();
+		} catch (IOException ex) {
+			res.status(500);
+			return ex.getMessage();
+		}
+	}
+
+	private static void readConfigFile() {
+
+		Properties prop = new Properties();
+
+		try {
+			BufferedInputStream in = new BufferedInputStream(new FileInputStream(configFile));
+			prop.load(in);
+			in.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		merchantAccount = prop.getProperty("merchantAccount");
+		apiKey = prop.getProperty("apiKey");
+		clientKey = prop.getProperty("clientKey");
+	}
 }
-
-/* ################# end UTILS ###################### */
-
-// Start server
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));

@@ -37,23 +37,21 @@
       </a>
     </header>
     <div class="container">
-      <!-- {{!-- Hidden divs with data passed from the Express server --}} -->
       <div id="clientKey" class="hidden">{{ clientKey }}</div>
       <div id="type" class="hidden">{{ type }}</div>
 
       <div id="payment-page">
         <div class="container">
-          <!-- {{!-- The Checkout integration type will be rendered below. --}} {{!--
-          Drop-in includes styling out-of-the-box, so no additional styling is
-          needed. --}} -->
           <div class="payment-container">
-            <div id="{{type}}" class="payment"></div>
+            <div id="component" class="payment">
+                <!-- Component will be rendered here -->
+            </div>
           </div>
         </div>
       </div>
 
       <!-- {{!-- Adyen Component client code --}} -->
-      <script type="text/javascript" src="../adyenImplementation.js"></script>
+      <script type="text/javascript" src="./client.js"></script>
     </div>
   </body>
 </html>
