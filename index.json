@@ -9,16 +9,12 @@
           "label": "NodeJS",
           "clients": [
             {
-              "name": "html",
-              "label": "HTML"
+              "name": "handlebar",
+              "label": "Handlebar"
             },
             {
               "name": "react",
               "label": "React"
-            },
-            {
-              "name": "handlebar",
-              "label": "Handlebar"
             }
           ]
         },
@@ -27,12 +23,12 @@
           "label": "Java",
           "clients": [
             {
-              "name": "html",
-              "label": "HTML"
-            },
-            {
               "name": "jinjava",
               "label": "JinJava"
+            },
+            {
+              "name": "html",
+              "label": "HTML"
             }
           ]
         },

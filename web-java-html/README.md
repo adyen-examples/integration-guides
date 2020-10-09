@@ -1,4 +1,4 @@
-# Drop-in tutorial: Node.js + Express
+# Drop-in tutorial: Java
 
 This tutorial explains the server- and client-side steps for integrating [Drop-in](/checkout/drop-in-web), our complete UI solution for accepting payments on your website. Integrating Drop-in is the quickest way to offer multiple payment methods, without having to build each payment method individually.
 
